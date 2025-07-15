@@ -192,8 +192,29 @@
 /* Features Grid */
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  max-width: 100%;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 1400px) {
+  .features-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
 }
 
 .feature-card {
@@ -202,6 +223,9 @@
   border-radius: 12px;
   padding: 20px;
   transition: all 0.2s;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 .feature-card:hover {
@@ -289,6 +313,8 @@ input:checked + .toggle-slider:before {
   flex-direction: column;
   gap: 8px;
   animation: slideDown 0.3s ease-out;
+  flex-grow: 1;
+  margin-top: 8px;
 }
 
 @keyframes slideDown {
@@ -429,6 +455,11 @@ input:checked + .checkbox-custom:after {
   
   .feature-card {
     padding: 16px;
+    min-height: auto;
+  }
+  
+  .permissions-section {
+    padding: 20px;
   }
 }
 
@@ -443,5 +474,10 @@ input:checked + .checkbox-custom:after {
   
   .role-dropdown {
     max-width: 100%;
+  }
+  
+  .feature-card {
+    padding: 16px;
+    min-height: auto;
   }
 }
