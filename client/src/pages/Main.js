@@ -1,10 +1,19 @@
 import React from 'react';
 import '../styles/Main.css';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function Main() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <div className="dashboard-container">
-
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
@@ -55,16 +64,51 @@ function Main() {
       {/* Main Content */}
       <main className="main-content">
         <header className="main-header">
-          {/* Header Content (e.g., Page Title) */}
-          <h1>Dashboard</h1>
+          <div className="header-left">
+            <h1>Dashboard</h1>
+          </div>
+          <div className="header-right">
+            <div className="user-info">
+              <span className="user-name">Welcome, {user?.name}!</span>
+              <span className="user-role">({user?.role})</span>
+            </div>
+            <button onClick={handleLogout} className="logout-btn">
+              <i className="icon logout-icon"></i>
+              Logout
+            </button>
+          </div>
         </header>
 
         <div className="content-area">
           {/* Your Dashboard Content Goes Here */}
-          <p>Welcome to your dashboard!  Add your components and content here.</p>
+          <div className="welcome-section">
+            <h2>Welcome to your dashboard!</h2>
+            <p>You are logged in as: <strong>{user?.name}</strong></p>
+            <p>Your role: <strong>{user?.role}</strong></p>
+            <p>Email: <strong>{user?.email}</strong></p>
+          </div>
+          
+          <div className="dashboard-cards">
+            <div className="card">
+              <h3>Quick Actions</h3>
+              <p>Add your components and content here.</p>
+            </div>
+            
+            {user?.role === 'ADMIN' && (
+              <div className="card admin-card">
+                <h3>Admin Panel</h3>
+                <p>Admin-only content visible here.</p>
+                <button className="btn-primary">Manage Users</button>
+              </div>
+            )}
+            
+            <div className="card">
+              <h3>Recent Activity</h3>
+              <p>Your recent activities will appear here.</p>
+            </div>
+          </div>
         </div>
       </main>
-
     </div>
   );
 }
