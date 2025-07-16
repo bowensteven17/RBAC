@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/RBACSettings.css';
 import Sidebar from './Sidebar';
+import { useAuth } from '../context/AuthContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faHouse, 
@@ -31,22 +32,34 @@ import {
   faSave,
   faEdit,
   faCheck,
-  faComments
+  faComments,
+  faTimes,
+  faTrash,
+  faExclamationTriangle,
+  faChevronDown,
+  faChevronRight
 } from '@fortawesome/free-solid-svg-icons';
 
 function RBACSettings() {
+  const { user } = useAuth();
   const [selectedRole, setSelectedRole] = useState('');
   const [permissions, setPermissions] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [showCreateRole, setShowCreateRole] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [isCreatingRole, setIsCreatingRole] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState('');
+  const [collapsedFeatures, setCollapsedFeatures] = useState({});
 
-  // Available roles
-  const roles = [
+  // Available roles - now as state so we can add/remove
+  const [roles, setRoles] = useState([
     'Legal',
     'Non-Legal', 
     'Viewer',
     'Editor',
     'Sub-Admin'
-  ];
+  ]);
 
   // Features and their sub-features
   const features = [
@@ -195,11 +208,25 @@ function RBACSettings() {
   useEffect(() => {
     // Initialize permissions from default or load from backend
     setPermissions(defaultPermissions);
+    
+    // Initialize all features as collapsed by default
+    const initialCollapsedState = {};
+    features.forEach(feature => {
+      initialCollapsedState[feature.key] = true; // true = collapsed
+    });
+    setCollapsedFeatures(initialCollapsedState);
   }, []);
 
   const handleRoleChange = (role) => {
     setSelectedRole(role);
     setHasChanges(false);
+  };
+
+  const toggleFeatureCollapse = (featureKey) => {
+    setCollapsedFeatures(prev => ({
+      ...prev,
+      [featureKey]: !prev[featureKey]
+    }));
   };
 
   const handleFeatureToggle = (featureKey) => {
@@ -247,8 +274,108 @@ function RBACSettings() {
     alert('Permissions saved successfully!');
   };
 
+  const handleCreateRole = () => {
+    if (!newRoleName.trim()) {
+      alert('Please enter a role name');
+      return;
+    }
+
+    if (roles.includes(newRoleName.trim())) {
+      alert('Role already exists');
+      return;
+    }
+
+    setIsCreatingRole(true);
+    
+    // Add new role to the list
+    const updatedRoles = [...roles, newRoleName.trim()];
+    setRoles(updatedRoles);
+    
+    // Initialize permissions for new role (all disabled by default)
+    const newRolePermissions = {};
+    features.forEach(feature => {
+      newRolePermissions[feature.key] = {
+        enabled: false,
+        subFeatures: {}
+      };
+      feature.subFeatures.forEach(subFeature => {
+        newRolePermissions[feature.key].subFeatures[subFeature.key] = false;
+      });
+    });
+    
+    setPermissions(prev => ({
+      ...prev,
+      [newRoleName.trim()]: newRolePermissions
+    }));
+    
+    // Select the new role and close the create form
+    setSelectedRole(newRoleName.trim());
+    setNewRoleName('');
+    setShowCreateRole(false);
+    setIsCreatingRole(false);
+    setHasChanges(true);
+    
+    console.log('Created new role:', newRoleName.trim());
+  };
+
+  const handleCancelCreate = () => {
+    setNewRoleName('');
+    setShowCreateRole(false);
+  };
+
+  const handleDeleteClick = (role) => {
+    setRoleToDelete(role);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteRole = () => {
+    if (!roleToDelete) return;
+
+    // Prevent deleting core roles
+    const coreRoles = ['Legal', 'Non-Legal', 'Viewer', 'Editor', 'Sub-Admin'];
+    if (coreRoles.includes(roleToDelete)) {
+      alert('Cannot delete core system roles');
+      setShowDeleteConfirm(false);
+      setRoleToDelete('');
+      return;
+    }
+
+    // Remove role from the list
+    const updatedRoles = roles.filter(role => role !== roleToDelete);
+    setRoles(updatedRoles);
+    
+    // Remove permissions for deleted role
+    const updatedPermissions = { ...permissions };
+    delete updatedPermissions[roleToDelete];
+    setPermissions(updatedPermissions);
+    
+    // Clear selection if deleted role was selected
+    if (selectedRole === roleToDelete) {
+      setSelectedRole('');
+    }
+    
+    setShowDeleteConfirm(false);
+    setRoleToDelete('');
+    setHasChanges(true);
+    
+    console.log('Deleted role:', roleToDelete);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setRoleToDelete('');
+  };
+
   const getCurrentRolePermissions = () => {
     return selectedRole ? permissions[selectedRole] || {} : {};
+  };
+
+  const getSubFeatureCount = (featureKey) => {
+    const rolePermissions = getCurrentRolePermissions();
+    const featurePermission = rolePermissions[featureKey] || { subFeatures: {} };
+    const enabledCount = Object.values(featurePermission.subFeatures).filter(Boolean).length;
+    const totalCount = features.find(f => f.key === featureKey)?.subFeatures.length || 0;
+    return { enabled: enabledCount, total: totalCount };
   };
 
   return (
@@ -257,117 +384,271 @@ function RBACSettings() {
       <Sidebar />
       
       <div className="rbac-settings-container">
-      <div className="rbac-header">
-        <div className="header-content">
-          <div className="header-left">
-            <FontAwesomeIcon icon={faShield} className="header-icon" />
-            <div>
-              <h1>Role-Based Access Control</h1>
-              <p>Manage permissions for different user roles</p>
+        <div className="rbac-header">
+          <div className="header-content">
+            <div className="header-left">
+              <FontAwesomeIcon icon={faShield} className="header-icon" />
+              <div>
+                <h1>Role-Based Access Control</h1>
+                <p>Manage permissions for different user roles</p>
+              </div>
+            </div>
+            <div className="header-actions">
+              {hasChanges && (
+                <button className="save-button" onClick={handleSave}>
+                  <FontAwesomeIcon icon={faSave} />
+                  Save Changes
+                </button>
+              )}
             </div>
           </div>
-          {hasChanges && (
-            <button className="save-button" onClick={handleSave}>
-              <FontAwesomeIcon icon={faSave} />
-              Save Changes
-            </button>
+        </div>
+
+        <div className="rbac-content">
+          <div className="role-selector-section">
+            <div className="role-selector-card">
+              <div className="card-header-with-actions">
+                <h3>
+                  <FontAwesomeIcon icon={faEdit} />
+                  Select Role to Edit
+                </h3>
+                {user?.role === 'ADMIN' && (
+                  <button 
+                    className="create-role-btn"
+                    onClick={() => setShowCreateRole(true)}
+                    title="Create New Role"
+                  >
+                    <FontAwesomeIcon icon={faPlus} />
+                  </button>
+                )}
+              </div>
+              <div className="role-dropdown-container">
+                <select 
+                  className="role-dropdown"
+                  value={selectedRole}
+                  onChange={(e) => handleRoleChange(e.target.value)}
+                >
+                  <option value="">Choose a role...</option>
+                  {roles.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+                {selectedRole && user?.role === 'ADMIN' && (
+                  <button 
+                    className="delete-role-btn"
+                    onClick={() => handleDeleteClick(selectedRole)}
+                    title="Delete Role"
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                  </button>
+                )}
+              </div>
+              <div className="role-status-area">
+                {selectedRole ? (
+                  <div className="selected-role-info">
+                    <FontAwesomeIcon icon={faCheck} className="check-icon" />
+                    <span>Configuring permissions for <strong>{selectedRole}</strong></span>
+                  </div>
+                ) : (
+                  <div className="no-role-selected">
+                    <FontAwesomeIcon icon={faEdit} className="edit-icon" />
+                    <span>Select a role above to configure its permissions</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Create New Role Modal */}
+          {showCreateRole && (
+            <div className="modal-overlay">
+              <div className="create-role-modal">
+                <div className="modal-header">
+                  <h3>
+                    <FontAwesomeIcon icon={faPlus} />
+                    Create New Role
+                  </h3>
+                  <button 
+                    className="modal-close"
+                    onClick={handleCancelCreate}
+                  >
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label htmlFor="newRoleName">Role Name</label>
+                    <input
+                      id="newRoleName"
+                      type="text"
+                      className="role-input"
+                      placeholder="Enter role name (e.g., Marketing, HR, etc.)"
+                      value={newRoleName}
+                      onChange={(e) => setNewRoleName(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleCreateRole()}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="modal-note">
+                    <FontAwesomeIcon icon={faCheck} className="note-icon" />
+                    <span>New roles start with all permissions disabled. You can configure them after creation.</span>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    className="btn-secondary"
+                    onClick={handleCancelCreate}
+                    disabled={isCreatingRole}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn-primary"
+                    onClick={handleCreateRole}
+                    disabled={isCreatingRole || !newRoleName.trim()}
+                  >
+                    {isCreatingRole ? (
+                      <>
+                        <FontAwesomeIcon icon={faSave} className="spinning" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <FontAwesomeIcon icon={faPlus} />
+                        Create Role
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Role Confirmation Modal */}
+          {showDeleteConfirm && (
+            <div className="modal-overlay">
+              <div className="delete-confirm-modal">
+                <div className="modal-header">
+                  <h3>
+                    <FontAwesomeIcon icon={faExclamationTriangle} />
+                    Delete Role
+                  </h3>
+                  <button 
+                    className="modal-close"
+                    onClick={handleCancelDelete}
+                  >
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
+                </div>
+                <div className="modal-body">
+                  <div className="warning-message">
+                    <p>Are you sure you want to delete the role <strong>"{roleToDelete}"</strong>?</p>
+                    <p className="warning-text">This action cannot be undone. All permissions for this role will be permanently removed.</p>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button 
+                    className="btn-secondary"
+                    onClick={handleCancelDelete}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn-danger"
+                    onClick={handleDeleteRole}
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                    Delete Role
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedRole && (
+            <div className="permissions-section">
+              <div className="permissions-header">
+                <h3>Feature Permissions for {selectedRole}</h3>
+                <p>Enable or disable features and their sub-components</p>
+              </div>
+
+              <div className="features-grid">
+                {features.map(feature => {
+                  const rolePermissions = getCurrentRolePermissions();
+                  const featurePermission = rolePermissions[feature.key] || { enabled: false, subFeatures: {} };
+                  const isCollapsed = collapsedFeatures[feature.key];
+                  const subFeatureCount = getSubFeatureCount(feature.key);
+                  
+                  return (
+                    <div key={feature.key} className="feature-card">
+                      <div className="feature-header">
+                        <div className="feature-info">
+                          <FontAwesomeIcon icon={feature.icon} className="feature-icon" />
+                          <div className="feature-text">
+                            <span className="feature-name">{feature.name}</span>
+                            <span className="feature-count">
+                              {subFeatureCount.enabled}/{subFeatureCount.total} enabled
+                            </span>
+                          </div>
+                        </div>
+                        <div className="feature-controls">
+                          <button
+                            className="collapse-btn"
+                            onClick={() => toggleFeatureCollapse(feature.key)}
+                            title={isCollapsed ? 'Expand sub-features' : 'Collapse sub-features'}
+                          >
+                            <FontAwesomeIcon 
+                              icon={isCollapsed ? faChevronRight : faChevronDown} 
+                              className="collapse-icon"
+                            />
+                          </button>
+                          <label className="permission-toggle">
+                            <input
+                              type="checkbox"
+                              checked={featurePermission.enabled}
+                              onChange={() => handleFeatureToggle(feature.key)}
+                            />
+                            <span className="toggle-slider"></span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {featurePermission.enabled && !isCollapsed && (
+                        <div className="sub-features">
+                          {feature.subFeatures.map(subFeature => (
+                            <div key={subFeature.key} className="sub-feature-item">
+                              <div className="sub-feature-info">
+                                <FontAwesomeIcon icon={subFeature.icon} className="sub-feature-icon" />
+                                <span className="sub-feature-name">{subFeature.name}</span>
+                              </div>
+                              <label className="permission-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={featurePermission.subFeatures[subFeature.key] || false}
+                                  onChange={() => handleSubFeatureToggle(feature.key, subFeature.key)}
+                                />
+                                <span className="checkbox-custom"></span>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!selectedRole && (
+            <div className="empty-state">
+              <FontAwesomeIcon icon={faShield} className="empty-icon" />
+              <h3>Select a Role to Begin</h3>
+              <p>Choose a role from the dropdown above to configure its permissions</p>
+            </div>
           )}
         </div>
       </div>
-
-      <div className="rbac-content">
-        <div className="role-selector-section">
-          <div className="role-selector-card">
-            <h3>
-              <FontAwesomeIcon icon={faEdit} />
-              Select Role to Edit
-            </h3>
-            <div className="role-dropdown-container">
-              <select 
-                className="role-dropdown"
-                value={selectedRole}
-                onChange={(e) => handleRoleChange(e.target.value)}
-              >
-                <option value="">Choose a role...</option>
-                {roles.map(role => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-            </div>
-            {selectedRole && (
-              <div className="selected-role-info">
-                <FontAwesomeIcon icon={faCheck} className="check-icon" />
-                <span>Configuring permissions for <strong>{selectedRole}</strong></span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {selectedRole && (
-          <div className="permissions-section">
-            <div className="permissions-header">
-              <h3>Feature Permissions for {selectedRole}</h3>
-              <p>Enable or disable features and their sub-components</p>
-            </div>
-
-            <div className="features-grid">
-              {features.map(feature => {
-                const rolePermissions = getCurrentRolePermissions();
-                const featurePermission = rolePermissions[feature.key] || { enabled: false, subFeatures: {} };
-                
-                return (
-                  <div key={feature.key} className="feature-card">
-                    <div className="feature-header">
-                      <div className="feature-info">
-                        <FontAwesomeIcon icon={feature.icon} className="feature-icon" />
-                        <span className="feature-name">{feature.name}</span>
-                      </div>
-                      <label className="permission-toggle">
-                        <input
-                          type="checkbox"
-                          checked={featurePermission.enabled}
-                          onChange={() => handleFeatureToggle(feature.key)}
-                        />
-                        <span className="toggle-slider"></span>
-                      </label>
-                    </div>
-
-                    {featurePermission.enabled && (
-                      <div className="sub-features">
-                        {feature.subFeatures.map(subFeature => (
-                          <div key={subFeature.key} className="sub-feature-item">
-                            <div className="sub-feature-info">
-                              <FontAwesomeIcon icon={subFeature.icon} className="sub-feature-icon" />
-                              <span className="sub-feature-name">{subFeature.name}</span>
-                            </div>
-                            <label className="permission-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={featurePermission.subFeatures[subFeature.key] || false}
-                                onChange={() => handleSubFeatureToggle(feature.key, subFeature.key)}
-                              />
-                              <span className="checkbox-custom"></span>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {!selectedRole && (
-          <div className="empty-state">
-            <FontAwesomeIcon icon={faShield} className="empty-icon" />
-            <h3>Select a Role to Begin</h3>
-            <p>Choose a role from the dropdown above to configure its permissions</p>
-          </div>
-        )}
-      </div>
-    </div>
     </div>
   );
 }
