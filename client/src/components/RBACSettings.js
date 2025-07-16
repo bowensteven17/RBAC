@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../styles/RBACSettings.css';
 import Sidebar from './Sidebar';
 import { useAuth } from '../context/AuthContext';
+import { rbacService } from '../services/rbacService';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faHouse, 
@@ -51,15 +52,11 @@ function RBACSettings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState('');
   const [collapsedFeatures, setCollapsedFeatures] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Available roles - now as state so we can add/remove
-  const [roles, setRoles] = useState([
-    'Legal',
-    'Non-Legal', 
-    'Viewer',
-    'Editor',
-    'Sub-Admin'
-  ]);
+  // Available roles - loaded from backend
+  const [roles, setRoles] = useState([]);
 
   // Features and their sub-features
   const features = [
@@ -151,70 +148,43 @@ function RBACSettings() {
     }
   ];
 
-  // Default permissions - you can load this from your backend
-  const defaultPermissions = {
-    'Legal': {
-      home: { enabled: true, subFeatures: { dashboard: true, recent: true, 'quick-actions': true } },
-      settings: { enabled: true, subFeatures: { profile: true, preferences: true, notifications: true } },
-      admin: { enabled: false, subFeatures: { users: false, roles: false, permissions: false, logs: false } },
-      conversational: { enabled: true, subFeatures: { chat: true, history: true, assistant: true } },
-      visualize: { enabled: true, subFeatures: { charts: true, reports: true, analytics: false } },
-      users: { enabled: false, subFeatures: { 'all-users': false, 'add-user': false, 'user-roles': false } },
-      config: { enabled: false, subFeatures: { system: false, database: false, api: false, security: false } },
-      discover: { enabled: true, subFeatures: { 'for-you': true, top: true, tech: true, finance: true, arts: true, sports: true, entertainment: true } }
-    },
-    'Non-Legal': {
-      home: { enabled: true, subFeatures: { dashboard: true, recent: true, 'quick-actions': true } },
-      settings: { enabled: true, subFeatures: { profile: true, preferences: true, notifications: true } },
-      admin: { enabled: false, subFeatures: { users: false, roles: false, permissions: false, logs: false } },
-      conversational: { enabled: true, subFeatures: { chat: true, history: true, assistant: true } },
-      visualize: { enabled: true, subFeatures: { charts: true, reports: false, analytics: false } },
-      users: { enabled: false, subFeatures: { 'all-users': false, 'add-user': false, 'user-roles': false } },
-      config: { enabled: false, subFeatures: { system: false, database: false, api: false, security: false } },
-      discover: { enabled: true, subFeatures: { 'for-you': true, top: true, tech: false, finance: false, arts: true, sports: true, entertainment: true } }
-    },
-    'Viewer': {
-      home: { enabled: true, subFeatures: { dashboard: true, recent: true, 'quick-actions': false } },
-      settings: { enabled: true, subFeatures: { profile: true, preferences: true, notifications: true } },
-      admin: { enabled: false, subFeatures: { users: false, roles: false, permissions: false, logs: false } },
-      conversational: { enabled: true, subFeatures: { chat: true, history: true, assistant: false } },
-      visualize: { enabled: true, subFeatures: { charts: true, reports: false, analytics: false } },
-      users: { enabled: false, subFeatures: { 'all-users': false, 'add-user': false, 'user-roles': false } },
-      config: { enabled: false, subFeatures: { system: false, database: false, api: false, security: false } },
-      discover: { enabled: true, subFeatures: { 'for-you': true, top: true, tech: false, finance: false, arts: true, sports: true, entertainment: true } }
-    },
-    'Editor': {
-      home: { enabled: true, subFeatures: { dashboard: true, recent: true, 'quick-actions': true } },
-      settings: { enabled: true, subFeatures: { profile: true, preferences: true, notifications: true } },
-      admin: { enabled: false, subFeatures: { users: false, roles: false, permissions: false, logs: true } },
-      conversational: { enabled: true, subFeatures: { chat: true, history: true, assistant: true } },
-      visualize: { enabled: true, subFeatures: { charts: true, reports: true, analytics: true } },
-      users: { enabled: true, subFeatures: { 'all-users': true, 'add-user': false, 'user-roles': false } },
-      config: { enabled: true, subFeatures: { system: true, database: false, api: true, security: false } },
-      discover: { enabled: true, subFeatures: { 'for-you': true, top: true, tech: true, finance: true, arts: true, sports: true, entertainment: true } }
-    },
-    'Sub-Admin': {
-      home: { enabled: true, subFeatures: { dashboard: true, recent: true, 'quick-actions': true } },
-      settings: { enabled: true, subFeatures: { profile: true, preferences: true, notifications: true } },
-      admin: { enabled: true, subFeatures: { users: true, roles: true, permissions: false, logs: true } },
-      conversational: { enabled: true, subFeatures: { chat: true, history: true, assistant: true } },
-      visualize: { enabled: true, subFeatures: { charts: true, reports: true, analytics: true } },
-      users: { enabled: true, subFeatures: { 'all-users': true, 'add-user': true, 'user-roles': true } },
-      config: { enabled: true, subFeatures: { system: true, database: true, api: true, security: false } },
-      discover: { enabled: true, subFeatures: { 'for-you': true, top: true, tech: true, finance: true, arts: true, sports: true, entertainment: true } }
-    }
-  };
-
+  // Load roles and permissions from backend
   useEffect(() => {
-    // Initialize permissions from default or load from backend
-    setPermissions(defaultPermissions);
-    
-    // Initialize all features as collapsed by default
-    const initialCollapsedState = {};
-    features.forEach(feature => {
-      initialCollapsedState[feature.key] = true; // true = collapsed
-    });
-    setCollapsedFeatures(initialCollapsedState);
+    const loadRoles = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await rbacService.getAllRoles();
+        if (response.success) {
+          const roleNames = response.data.map(role => role.name);
+          setRoles(roleNames);
+          
+          // Convert permissions to expected format
+          const permissionsMap = {};
+          response.data.forEach(role => {
+            permissionsMap[role.name] = role.permissions;
+          });
+          setPermissions(permissionsMap);
+        }
+      } catch (error) {
+        console.error('Error loading roles:', error);
+        setError('Failed to load roles. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const initializeCollapsedState = () => {
+      const initialCollapsedState = {};
+      features.forEach(feature => {
+        initialCollapsedState[feature.key] = true;
+      });
+      setCollapsedFeatures(initialCollapsedState);
+    };
+
+    loadRoles();
+    initializeCollapsedState();
   }, []);
 
   const handleRoleChange = (role) => {
@@ -265,16 +235,26 @@ function RBACSettings() {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    // Here you would save to your backend
-    console.log('Saving permissions:', permissions);
-    setHasChanges(false);
+  const handleSave = async () => {
+    if (!selectedRole) return;
     
-    // Show success message
-    alert('Permissions saved successfully!');
+    try {
+      setLoading(true);
+      const response = await rbacService.updateRolePermissions(selectedRole, permissions[selectedRole]);
+      
+      if (response.success) {
+        setHasChanges(false);
+        alert('Permissions saved successfully!');
+      }
+    } catch (error) {
+      console.error('Error saving permissions:', error);
+      alert('Failed to save permissions. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreateRole = () => {
+  const handleCreateRole = async () => {
     if (!newRoleName.trim()) {
       alert('Please enter a role name');
       return;
@@ -287,35 +267,44 @@ function RBACSettings() {
 
     setIsCreatingRole(true);
     
-    // Add new role to the list
-    const updatedRoles = [...roles, newRoleName.trim()];
-    setRoles(updatedRoles);
-    
-    // Initialize permissions for new role (all disabled by default)
-    const newRolePermissions = {};
-    features.forEach(feature => {
-      newRolePermissions[feature.key] = {
-        enabled: false,
-        subFeatures: {}
-      };
-      feature.subFeatures.forEach(subFeature => {
-        newRolePermissions[feature.key].subFeatures[subFeature.key] = false;
+    try {
+      // Initialize permissions for new role (all disabled by default)
+      const newRolePermissions = {};
+      features.forEach(feature => {
+        newRolePermissions[feature.key] = {
+          enabled: false,
+          subFeatures: {}
+        };
+        feature.subFeatures.forEach(subFeature => {
+          newRolePermissions[feature.key].subFeatures[subFeature.key] = false;
+        });
       });
-    });
-    
-    setPermissions(prev => ({
-      ...prev,
-      [newRoleName.trim()]: newRolePermissions
-    }));
-    
-    // Select the new role and close the create form
-    setSelectedRole(newRoleName.trim());
-    setNewRoleName('');
-    setShowCreateRole(false);
-    setIsCreatingRole(false);
-    setHasChanges(true);
-    
-    console.log('Created new role:', newRoleName.trim());
+      
+      const response = await rbacService.createRole(newRoleName.trim(), newRolePermissions);
+      
+      if (response.success) {
+        // Update local state
+        const updatedRoles = [...roles, newRoleName.trim()];
+        setRoles(updatedRoles);
+        
+        setPermissions(prev => ({
+          ...prev,
+          [newRoleName.trim()]: newRolePermissions
+        }));
+        
+        // Select the new role and close the create form
+        setSelectedRole(newRoleName.trim());
+        setNewRoleName('');
+        setShowCreateRole(false);
+        
+        alert('Role created successfully!');
+      }
+    } catch (error) {
+      console.error('Error creating role:', error);
+      alert('Failed to create role. Please try again.');
+    } finally {
+      setIsCreatingRole(false);
+    }
   };
 
   const handleCancelCreate = () => {
@@ -328,42 +317,58 @@ function RBACSettings() {
     setShowDeleteConfirm(true);
   };
 
-  const handleDeleteRole = () => {
+  const handleDeleteRole = async () => {
     if (!roleToDelete) return;
 
-    // Prevent deleting core roles
-    const coreRoles = ['Legal', 'Non-Legal', 'Viewer', 'Editor', 'Sub-Admin'];
-    if (coreRoles.includes(roleToDelete)) {
-      alert('Cannot delete core system roles');
-      setShowDeleteConfirm(false);
-      setRoleToDelete('');
-      return;
+    try {
+      const response = await rbacService.deleteRole(roleToDelete);
+      
+      if (response.success) {
+        // Update local state
+        const updatedRoles = roles.filter(role => role !== roleToDelete);
+        setRoles(updatedRoles);
+        
+        // Remove permissions for deleted role
+        const updatedPermissions = { ...permissions };
+        delete updatedPermissions[roleToDelete];
+        setPermissions(updatedPermissions);
+        
+        // Clear selection if deleted role was selected
+        if (selectedRole === roleToDelete) {
+          setSelectedRole('');
+        }
+        
+        setShowDeleteConfirm(false);
+        setRoleToDelete('');
+        
+        alert('Role deleted successfully!');
+      }
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      alert(error.message || 'Failed to delete role. Please try again.');
     }
-
-    // Remove role from the list
-    const updatedRoles = roles.filter(role => role !== roleToDelete);
-    setRoles(updatedRoles);
-    
-    // Remove permissions for deleted role
-    const updatedPermissions = { ...permissions };
-    delete updatedPermissions[roleToDelete];
-    setPermissions(updatedPermissions);
-    
-    // Clear selection if deleted role was selected
-    if (selectedRole === roleToDelete) {
-      setSelectedRole('');
-    }
-    
-    setShowDeleteConfirm(false);
-    setRoleToDelete('');
-    setHasChanges(true);
-    
-    console.log('Deleted role:', roleToDelete);
   };
 
   const handleCancelDelete = () => {
     setShowDeleteConfirm(false);
     setRoleToDelete('');
+  };
+
+  const handleInitialize = async () => {
+    try {
+      setLoading(true);
+      const response = await rbacService.initializeRBAC();
+      
+      if (response.success) {
+        // Reload the roles and permissions
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error initializing RBAC:', error);
+      alert('Failed to initialize RBAC. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getCurrentRolePermissions = () => {
@@ -377,6 +382,42 @@ function RBACSettings() {
     const totalCount = features.find(f => f.key === featureKey)?.subFeatures.length || 0;
     return { enabled: enabledCount, total: totalCount };
   };
+
+  if (loading) {
+    return (
+      <div className="dashboard-container">
+        <Sidebar />
+        <div className="rbac-settings-container">
+          <div className="loading-state">
+            <FontAwesomeIcon icon={faShield} className="loading-icon" />
+            <h3>Loading RBAC Settings...</h3>
+            <p>Please wait while we load the roles and permissions</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard-container">
+        <Sidebar />
+        <div className="rbac-settings-container">
+          <div className="error-state">
+            <FontAwesomeIcon icon={faExclamationTriangle} className="error-icon" />
+            <h3>Error Loading RBAC Settings</h3>
+            <p>{error}</p>
+            <button 
+              className="btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">
@@ -394,6 +435,16 @@ function RBACSettings() {
               </div>
             </div>
             <div className="header-actions">
+              {user?.role === 'ADMIN' && roles.length === 0 && (
+                <button 
+                  className="initialize-button"
+                  onClick={handleInitialize}
+                  disabled={loading}
+                >
+                  <FontAwesomeIcon icon={faGears} />
+                  Initialize RBAC
+                </button>
+              )}
               {hasChanges && (
                 <button className="save-button" onClick={handleSave}>
                   <FontAwesomeIcon icon={faSave} />
@@ -429,7 +480,7 @@ function RBACSettings() {
                   onChange={(e) => handleRoleChange(e.target.value)}
                 >
                   <option value="">Choose a role...</option>
-                  {roles.map(role => (
+                  {roles.filter(role => role !== 'ADMIN').map(role => (
                     <option key={role} value={role}>{role}</option>
                   ))}
                 </select>

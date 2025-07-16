@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import '../styles/Sidebar.css';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '../hooks/usePermissions';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faHouse, 
@@ -36,6 +37,7 @@ import {
 function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
   const [hoveredItem, setHoveredItem] = useState(null);
   const [expandedPanel, setExpandedPanel] = useState(null);
 
@@ -44,108 +46,108 @@ function Sidebar() {
     navigate('/login');
   };
 
-  // Navigation items with nested subcategories
+  // Navigation items with feature-based permissions
   const navigationItems = [
     { 
       name: 'Home', 
       icon: faHouse, 
       path: '/', 
-      roles: ['Legal', 'Non-Legal', 'Viewer', 'Editor', 'Sub-Admin', 'ADMIN'],
+      feature: 'home',
       subcategories: [
-        { name: 'Dashboard', icon: faChartSimple, path: '/dashboard' },
-        { name: 'Recent Activity', icon: faChartLine, path: '/recent' },
-        { name: 'Quick Actions', icon: faStar, path: '/quick-actions' }
+        { name: 'Dashboard', icon: faChartSimple, path: '/dashboard', feature: 'home', subFeature: 'dashboard' },
+        { name: 'Recent Activity', icon: faChartLine, path: '/recent', feature: 'home', subFeature: 'recent' },
+        { name: 'Quick Actions', icon: faStar, path: '/quick-actions', feature: 'home', subFeature: 'quick-actions' }
       ]
     },
     { 
       name: 'Discover', 
       icon: faGlobe, 
       path: '/discover', 
-      roles: ['Legal', 'Non-Legal', 'Viewer', 'Editor', 'Sub-Admin', 'ADMIN'],
+      feature: 'discover',
       subcategories: [
-        { name: 'For You', icon: faStar, path: '/discover/for-you' },
-        { name: 'Top', icon: faArrowTrendUp, path: '/discover/top' },
-        { name: 'Tech & Science', icon: faLaptop, path: '/discover/tech' },
-        { name: 'Finance', icon: faDollarSign, path: '/discover/finance' },
-        { name: 'Arts & Culture', icon: faImage, path: '/discover/arts' },
-        { name: 'Sports', icon: faGamepad, path: '/discover/sports' },
-        { name: 'Entertainment', icon: faUtensils, path: '/discover/entertainment' }
+        { name: 'For You', icon: faStar, path: '/discover/for-you', feature: 'discover', subFeature: 'for-you' },
+        { name: 'Top', icon: faArrowTrendUp, path: '/discover/top', feature: 'discover', subFeature: 'top' },
+        { name: 'Tech & Science', icon: faLaptop, path: '/discover/tech', feature: 'discover', subFeature: 'tech' },
+        { name: 'Finance', icon: faDollarSign, path: '/discover/finance', feature: 'discover', subFeature: 'finance' },
+        { name: 'Arts & Culture', icon: faImage, path: '/discover/arts', feature: 'discover', subFeature: 'arts' },
+        { name: 'Sports', icon: faGamepad, path: '/discover/sports', feature: 'discover', subFeature: 'sports' },
+        { name: 'Entertainment', icon: faUtensils, path: '/discover/entertainment', feature: 'discover', subFeature: 'entertainment' }
       ]
     },
     { 
       name: 'Conversational', 
       icon: faComments, 
       path: '/conversational', 
-      roles: ['Legal', 'Non-Legal', 'Viewer', 'Editor', 'Sub-Admin', 'ADMIN'],
+      feature: 'conversational',
       subcategories: [
-        { name: 'Chat Interface', icon: faComments, path: '/conversational/chat' },
-        { name: 'Message History', icon: faFileText, path: '/conversational/history' },
-        { name: 'AI Assistant', icon: faUser, path: '/conversational/assistant' }
+        { name: 'Chat Interface', icon: faComments, path: '/conversational/chat', feature: 'conversational', subFeature: 'chat' },
+        { name: 'Message History', icon: faFileText, path: '/conversational/history', feature: 'conversational', subFeature: 'history' },
+        { name: 'AI Assistant', icon: faUser, path: '/conversational/assistant', feature: 'conversational', subFeature: 'assistant' }
       ]
     },
     { 
       name: 'Visualize', 
       icon: faChartSimple, 
       path: '/visualize', 
-      roles: ['Legal', 'Non-Legal', 'Viewer', 'Editor', 'Sub-Admin', 'ADMIN'],
+      feature: 'visualize',
       subcategories: [
-        { name: 'Charts', icon: faChartBar, path: '/visualize/charts' },
-        { name: 'Reports', icon: faFileText, path: '/visualize/reports' },
-        { name: 'Analytics', icon: faChartLine, path: '/visualize/analytics' }
+        { name: 'Charts', icon: faChartBar, path: '/visualize/charts', feature: 'visualize', subFeature: 'charts' },
+        { name: 'Reports', icon: faFileText, path: '/visualize/reports', feature: 'visualize', subFeature: 'reports' },
+        { name: 'Analytics', icon: faChartLine, path: '/visualize/analytics', feature: 'visualize', subFeature: 'analytics' }
       ]
     },
     { 
       name: 'Config', 
       icon: faGear, 
       path: '/config', 
-      roles: ['Editor', 'Sub-Admin', 'ADMIN'],
+      feature: 'config',
       subcategories: [
-        { name: 'System Settings', icon: faGears, path: '/config/system' },
-        { name: 'Database Config', icon: faDatabase, path: '/config/database' },
-        { name: 'API Settings', icon: faCloud, path: '/config/api' },
-        { name: 'Security', icon: faLock, path: '/config/security' }
+        { name: 'System Settings', icon: faGears, path: '/config/system', feature: 'config', subFeature: 'system' },
+        { name: 'Database Config', icon: faDatabase, path: '/config/database', feature: 'config', subFeature: 'database' },
+        { name: 'API Settings', icon: faCloud, path: '/config/api', feature: 'config', subFeature: 'api' },
+        { name: 'Security', icon: faLock, path: '/config/security', feature: 'config', subFeature: 'security' }
       ]
     },
     { 
       name: 'Users', 
       icon: faUsers, 
       path: '/users', 
-      roles: ['Sub-Admin', 'ADMIN'],
+      feature: 'users',
       subcategories: [
-        { name: 'All Users', icon: faUsers, path: '/users/all' },
-        { name: 'Add User', icon: faPlus, path: '/users/add' },
-        { name: 'User Roles', icon: faUserCheck, path: '/users/roles' }
+        { name: 'All Users', icon: faUsers, path: '/users/all', feature: 'users', subFeature: 'all-users' },
+        { name: 'Add User', icon: faPlus, path: '/users/add', feature: 'users', subFeature: 'add-user' },
+        { name: 'User Roles', icon: faUserCheck, path: '/users/roles', feature: 'users', subFeature: 'user-roles' }
       ]
     },
     { 
       name: 'Admin', 
       icon: faShield, 
       path: '/admin', 
-      roles: ['Sub-Admin', 'ADMIN'],
+      feature: 'admin',
       subcategories: [
-        { name: 'User Management', icon: faUsers, path: '/admin/users' },
-        { name: 'Role Settings', icon: faUserCheck, path: '/admin/roles' },
-        { name: 'Permissions', icon: faLock, path: '/admin/permissions' },
-        { name: 'System Logs', icon: faFileText, path: '/admin/logs' }
+        { name: 'User Management', icon: faUsers, path: '/admin/users', feature: 'admin', subFeature: 'users' },
+        { name: 'Role Settings', icon: faUserCheck, path: '/admin/roles', feature: 'admin', subFeature: 'roles' },
+        { name: 'Permissions', icon: faLock, path: '/admin/permissions', feature: 'admin', subFeature: 'permissions' },
+        { name: 'System Logs', icon: faFileText, path: '/admin/logs', feature: 'admin', subFeature: 'logs' }
       ]
     },
     { 
       name: 'Settings', 
       icon: faGears, 
       path: '/settings', 
-      roles: ['ADMIN'],
+      feature: 'settings',
       subcategories: [
-        { name: 'Profile Settings', icon: faUser, path: '/settings/profile' },
-        { name: 'RBAC Settings', icon: faShield, path: '/settings/rbac' },
-        { name: 'Preferences', icon: faCog, path: '/settings/preferences' },
-        { name: 'Notifications', icon: faBell, path: '/settings/notifications' }
+        { name: 'Profile Settings', icon: faUser, path: '/settings/profile', feature: 'settings', subFeature: 'profile' },
+        { name: 'RBAC Settings', icon: faShield, path: '/settings/rbac', feature: 'admin', subFeature: 'roles' },
+        { name: 'Preferences', icon: faCog, path: '/settings/preferences', feature: 'settings', subFeature: 'preferences' },
+        { name: 'Notifications', icon: faBell, path: '/settings/notifications', feature: 'settings', subFeature: 'notifications' }
       ]
     }
   ];
 
-  // Filter navigation items based on user role
+  // Filter navigation items based on user permissions
   const filteredNavItems = navigationItems.filter(item => 
-    item.roles.includes(user?.role)
+    hasPermission(item.feature)
   );
 
   const handleItemHover = (item, index) => {
@@ -232,7 +234,9 @@ function Sidebar() {
           
           <div className="panel-content">
             <ul className="subcategory-list">
-              {expandedPanel.subcategories?.map((subcat, index) => (
+              {expandedPanel.subcategories?.filter(subcat => 
+                hasPermission(subcat.feature, subcat.subFeature)
+              ).map((subcat, index) => (
                 <li key={index} className="subcategory-item">
                   <button 
                     className="subcategory-link"
