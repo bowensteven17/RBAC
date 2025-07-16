@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import '../styles/Main.css';
 import { useAuth } from '../context/AuthContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -6,12 +6,32 @@ import {
   faChartSimple, 
   faShield, 
   faUsers,
-  faGear
+  faGear,
+  faGears
 } from '@fortawesome/free-solid-svg-icons';
 import Sidebar from '../components/Sidebar';
+import PermissionGuard from '../components/PermissionGuard';
+import { usePermissions } from '../hooks/usePermissions';
+import { rbacService } from '../services/rbacService';
 
 function Main() {
   const { user } = useAuth();
+  const { error } = usePermissions();
+  const [initializingRBAC, setInitializingRBAC] = useState(false);
+
+  const handleInitializeRBAC = async () => {
+    try {
+      setInitializingRBAC(true);
+      await rbacService.initializeRBAC();
+      alert('RBAC system initialized successfully! Please refresh the page.');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error initializing RBAC:', error);
+      alert('Failed to initialize RBAC system. Please try again.');
+    } finally {
+      setInitializingRBAC(false);
+    }
+  };
 
   return (
     <div className="dashboard-container">
@@ -38,6 +58,37 @@ function Main() {
             <p>You are logged in as: <strong>{user?.name}</strong></p>
             <p>Your role: <strong>{user?.role}</strong></p>
             <p>Email: <strong>{user?.email}</strong></p>
+            
+            {error && (
+              <div style={{
+                backgroundColor: '#fff3cd',
+                color: '#856404',
+                padding: '10px',
+                marginTop: '10px',
+                borderRadius: '5px',
+                border: '1px solid #ffeaa7'
+              }}>
+                <strong>⚠️ RBAC System Not Initialized</strong>
+                <p>The role-based access control system needs to be set up.</p>
+                {user?.role === 'ADMIN' && (
+                  <button 
+                    onClick={handleInitializeRBAC}
+                    disabled={initializingRBAC}
+                    style={{
+                      backgroundColor: '#007bff',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      cursor: initializingRBAC ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <FontAwesomeIcon icon={faGears} style={{ marginRight: '5px' }} />
+                    {initializingRBAC ? 'Initializing...' : 'Initialize RBAC System'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="dashboard-cards">
@@ -49,19 +100,21 @@ function Main() {
               <p>Add your components and content here.</p>
             </div>
             
-            {user?.role === 'ADMIN' && (
+            <PermissionGuard requiredFeature="admin">
               <div className="card admin-card">
                 <div className="card-header">
                   <FontAwesomeIcon icon={faShield} className="card-icon" />
                   <h3>Admin Panel</h3>
                 </div>
                 <p>Admin-only content visible here.</p>
-                <button className="btn-primary">
-                  <FontAwesomeIcon icon={faUsers} />
-                  Manage Users
-                </button>
+                <PermissionGuard requiredFeature="admin" requiredSubFeature="users">
+                  <button className="btn-primary">
+                    <FontAwesomeIcon icon={faUsers} />
+                    Manage Users
+                  </button>
+                </PermissionGuard>
               </div>
-            )}
+            </PermissionGuard>
             
             <div className="card">
               <div className="card-header">

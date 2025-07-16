@@ -1,6 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Role = require('../models/Role');
+const { ensureRBACInitialized } = require('../middleware/rbacMiddleware');
 const router = express.Router();
 
 // Generate JWT token
@@ -85,7 +87,7 @@ router.post('/login', async (req, res) => {
 // @route   POST /api/auth/register
 // @desc    Register new user
 // @access  Public
-router.post('/register', async (req, res) => {
+router.post('/register', ensureRBACInitialized, async (req, res) => {
     try {
       const { email, password, name, role } = req.body;
   
@@ -105,13 +107,32 @@ router.post('/register', async (req, res) => {
           message: 'User already exists with this email'
         });
       }
+
+      // Validate role exists in RBAC system
+      const userRole = role || 'Viewer';
+      const roleExists = await Role.findOne({ name: userRole });
+      if (!roleExists) {
+        return res.status(400).json({
+          success: false,
+          message: `Role '${userRole}' does not exist in the system`
+        });
+      }
+
+      // Prevent registration with admin roles
+      const adminRoles = ['ADMIN', 'admin', 'Sub-Admin'];
+      if (adminRoles.includes(userRole)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot register with admin roles'
+        });
+      }
   
       // Create user
       const user = await User.create({
         email,
         password,
         name,
-        role: role || 'VIEWER' // Default to VIEWER if no role specified
+        role: userRole
       });
   
       // Generate token
@@ -131,6 +152,24 @@ router.post('/register', async (req, res) => {
   
     } catch (error) {
       console.error('Registration error:', error);
+      
+      // Handle validation errors
+      if (error.name === 'ValidationError') {
+        const validationErrors = Object.values(error.errors).map(err => err.message);
+        return res.status(400).json({
+          success: false,
+          message: validationErrors.join(', ')
+        });
+      }
+      
+      // Handle duplicate email error
+      if (error.code === 11000) {
+        return res.status(400).json({
+          success: false,
+          message: 'User already exists with this email'
+        });
+      }
+      
       res.status(500).json({
         success: false,
         message: 'Server error'

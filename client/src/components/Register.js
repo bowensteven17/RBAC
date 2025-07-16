@@ -1,18 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/Register.css';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { rbacService } from '../services/rbacService';
 
 function Register() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('VIEWER'); // Default role
+  const [role, setRole] = useState('Viewer'); // Default role
+  const [availableRoles, setAvailableRoles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [rolesLoading, setRolesLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  // Load available roles on component mount
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        setRolesLoading(true);
+        const response = await rbacService.getAllRoles();
+        
+        if (response.success) {
+          // Filter out admin roles and roles that shouldn't be available for registration
+          const adminRoles = ['ADMIN', 'Sub-Admin'];
+          const filteredRoles = response.data
+            .filter(role => !adminRoles.includes(role.name))
+            .map(role => role.name);
+          
+          setAvailableRoles(filteredRoles);
+          
+          // Set default role to first available role or 'Viewer'
+          if (filteredRoles.length > 0) {
+            setRole(filteredRoles.includes('Viewer') ? 'Viewer' : filteredRoles[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading roles:', error);
+        // If no roles are available, show error message
+        setError('Unable to load available roles. The system may not be properly initialized.');
+        setAvailableRoles([]);
+      } finally {
+        setRolesLoading(false);
+      }
+    };
+
+    loadRoles();
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -20,6 +57,13 @@ function Register() {
     setError('');
 
     // Client-side validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email format (e.g., user@example.com)");
+      setLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setLoading(false);
@@ -58,7 +102,11 @@ function Register() {
         // Redirect to main page
         navigate('/login');
       } else {
-        setError(data.message || 'Registration failed');
+        if (data.code === 'RBAC_NOT_INITIALIZED') {
+          setError('The system is not properly initialized. Please contact the administrator to set up user roles.');
+        } else {
+          setError(data.message || 'Registration failed');
+        }
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -102,13 +150,22 @@ function Register() {
             id="role"
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            disabled={loading}
+            disabled={loading || rolesLoading}
             required
           >
-            <option value="VIEWER">Viewer</option>
-            <option value="EDITOR">Editor</option>
-            <option value="ADMIN">Admin</option>
+            {rolesLoading ? (
+              <option value="">Loading roles...</option>
+            ) : (
+              <>
+                {availableRoles.map(roleName => (
+                  <option key={roleName} value={roleName}>
+                    {roleName}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
+          {rolesLoading && <small className="loading-text">Loading available roles...</small>}
         </div>
         <div className="form-group">
           <label htmlFor="password">Password:</label>
@@ -133,8 +190,8 @@ function Register() {
             disabled={loading}
           />
         </div>
-        <button type="submit" disabled={loading}>
-          {loading ? 'Creating Account...' : 'Register'}
+        <button type="submit" disabled={loading || rolesLoading || availableRoles.length === 0}>
+          {loading ? 'Creating Account...' : rolesLoading ? 'Loading...' : availableRoles.length === 0 ? 'No Roles Available' : 'Register'}
         </button>
       </form>
       
