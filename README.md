@@ -18,7 +18,6 @@ A full-stack web application implementing Role-Based Access Control (RBAC) with 
 - **React Router DOM 7.6.3** - Client-side routing
 - **FontAwesome** - Icons
 - **Tailwind CSS** - Utility-first CSS framework
-- **React Testing Library** - Testing utilities
 
 ### Backend
 - **Node.js** - Runtime environment
