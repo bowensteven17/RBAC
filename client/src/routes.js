@@ -31,22 +31,6 @@ const routes = [
     },
     // Add more protected routes as needed
     {
-        path : "dashboard",
-        element : (
-            <ProtectedRoute requiredFeature="home" requiredSubFeature="dashboard">
-                <Main/>
-            </ProtectedRoute>
-        )
-    },
-    {
-        path : "users",
-        element : (
-            <ProtectedRoute requiredFeature="users" requiredSubFeature="all-users">
-                <div>Users Management Page</div>
-            </ProtectedRoute>
-        )
-    },
-    {
         path : "users/add",
         element : (
             <ProtectedRoute requiredFeature="users" requiredSubFeature="add-user">
@@ -87,22 +71,6 @@ const routes = [
         )
     },
     {
-        path : "analytics",
-        element : (
-            <ProtectedRoute requiredFeature="visualize" requiredSubFeature="analytics">
-                <div>Analytics Dashboard</div>
-            </ProtectedRoute>
-        )
-    },
-    {
-        path : "reports",
-        element : (
-            <ProtectedRoute requiredFeature="visualize" requiredSubFeature="reports">
-                <div>Reports Page</div>
-            </ProtectedRoute>
-        )
-    },
-    {
         path : "config",
         element : (
             <ProtectedRoute requiredFeature="config">
@@ -115,14 +83,6 @@ const routes = [
         element : (
             <ProtectedRoute requiredFeature="discover">
                 <div>Discover Page</div>
-            </ProtectedRoute>
-        )
-    },
-    {
-        path : "chat",
-        element : (
-            <ProtectedRoute requiredFeature="conversational" requiredSubFeature="chat">
-                <div>Chat Interface</div>
             </ProtectedRoute>
         )
     }
